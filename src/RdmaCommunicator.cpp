@@ -4,8 +4,8 @@
 
 #include <iostream>
 #include <sstream>
-#include "../../include/RdmaCommunicator.h"
-#include "../../include/utils.h"
+#include "../include/RdmaCommunicator.h"
+#include "../include/utils.h"
 
 RdmaCommunicator::RdmaCommunicator(char * hostname, char * port) {
     if (port == nullptr or std::string(port).empty()) {

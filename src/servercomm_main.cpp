@@ -3,7 +3,7 @@
 //
 
 #include <iostream>
-#include "../../include/RdmaCommunicator.h"
+#include "../include/RdmaCommunicator.h"
 
 #define IP "192.168.4.99"
 #define PORT "9988"
@@ -27,6 +27,8 @@ int main() {
         // RDMA Write: as a server it actually registers the buffer as rdma-read ready
         char * msg = "hello from server!";
         cli->Write(msg, strlen(msg));
+
+        cli->Close();
     }
     catch (std::string & exc) {
         std::cerr << exc << std::endl;

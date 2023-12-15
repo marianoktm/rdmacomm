@@ -2,7 +2,7 @@
 // Created by Mariano Aponte on 30/11/23.
 //
 
-#include "../../include/ktmrdma.h"
+#include "../include/ktmrdma.h"
 
 void ktm_rdma_getaddrinfo(char  *node,  char  *service,  struct  rdma_addrinfo  *hints, struct rdma_addrinfo **res) {
     if (rdma_getaddrinfo(node, service, hints, res) == -1) {

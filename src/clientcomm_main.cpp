@@ -3,7 +3,7 @@
 //
 
 #include <iostream>
-#include "../../include/RdmaCommunicator.h"
+#include "../include/RdmaCommunicator.h"
 
 #define IP "192.168.4.99"
 #define PORT "9988"

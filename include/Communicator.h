@@ -29,8 +29,6 @@ public:
     virtual std::string to_string() { return "communicator"; }
 
     virtual void run(){};
-
-private:
 };
 
 #endif //RDMACM_COMMUNICATOR_H
