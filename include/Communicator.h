@@ -8,11 +8,16 @@
 #include <cstddef>
 #include <string>
 
+/**
+ * @brief Original Communicator abstract class of GVirtuS
+ *
+ * Communication can involve serving requests, accepting connections, reading and
+ * writing data, synchronizing communication state, and closing connections.
+ */
 class Communicator {
 public:
 
     virtual ~Communicator() = default;
-
 
     virtual void Serve() = 0;
 

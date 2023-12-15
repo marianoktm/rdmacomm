@@ -3,9 +3,7 @@
 //
 
 #include <iostream>
-#include <sstream>
 #include "../include/RdmaCommunicator.h"
-#include "../include/utils.h"
 
 RdmaCommunicator::RdmaCommunicator(char * hostname, char * port) {
     if (port == nullptr or std::string(port).empty()) {
@@ -97,188 +95,6 @@ void RdmaCommunicator::Connect() {
     ktm_rdma_connect(rdmaCmId, nullptr);
 }
 
-/*
-size_t RdmaCommunicator::Read(char *buffer, size_t size) {
-#ifdef DEBUG
-    std::cout << "RdmaCommunicator::Read(): called." << std::endl;
-#endif
-    // If I'm client, I want to read into buffer from server
-    // If I'm server, I want to set buffer to the client to write
-
-    char * rdmaExcBuffer = static_cast<char *>(malloc(BUF_SIZE));
-    ibv_mr * rdmaExcMr = ktm_rdma_reg_msgs(rdmaCmId, rdmaExcBuffer, BUF_SIZE);
-
-    uintptr_t peer_address = 0;
-    uint32_t peer_rkey = 0;
-
-    ibv_mr * memoryRegion;
-
-#ifdef DEBUG
-    std::cout << tab << "EXCHANGING RDMA INFORMATIONS..." << std::endl;
-#endif
-    if (isServing) {
-        // If I'm server, I want to set buffer to the client to write
-        memoryRegion = ktm_rdma_reg_write(rdmaCmId, buffer, size);
-
-        ktm_server_exchange_rdma_info(rdmaCmId, rdmaExcBuffer, BUF_SIZE, rdmaExcMr, &peer_address, &peer_rkey, memoryRegion);
-#ifdef DEBUG
-        std::cout << doubletab << "server: " << "using peer address: " << peer_address << "(" << (void * ) peer_address << ") and peer rkey: " << peer_rkey << std::endl;
-        std::cout << doubletab << "the buffer is now rdma-write ready." << std::endl;
-#endif
-    }
-    else {
-        // If I'm client, I want to read into buffer from server
-        memoryRegion = ktm_rdma_reg_msgs(rdmaCmId, buffer, size);
-
-        ktm_client_exchange_rdma_info(rdmaCmId, rdmaExcBuffer, BUF_SIZE, rdmaExcMr, &peer_address, &peer_rkey, memoryRegion);
-#ifdef DEBUG
-        std::cout << doubletab << "client: " << "using peer address: " << "(" << (void * ) peer_address << ") and peer rkey: " << peer_rkey << std::endl;
-        std::cout << doubletab << "the buffer is now ready to read from server." << std::endl;
-#endif
-    }
-#ifdef DEBUG
-    std::cout << tab << "DONE! (exchanging rdma informations)" << std::endl;
-#endif
-
-#ifdef DEBUG
-    std::cout << tab <<  "self address: " << (uintptr_t) memoryRegion->addr << "(" << memoryRegion->addr << "), self rkey: " << memoryRegion->rkey << std::endl;
-#endif
-
-    rdma_dereg_mr(rdmaExcMr);
-    free(rdmaExcBuffer);
-
-    int num_wc;
-    ibv_wc workCompletion;
-    memset(&workCompletion, 0, sizeof(workCompletion));
-
-    char * completionMsg = static_cast<char *>(calloc(1, sizeof(char)));
-    ibv_mr * completionMr = ktm_rdma_reg_msgs(rdmaCmId, completionMsg, 1);
-
-#ifdef DEBUG
-    std::cout << tab << "PERFORMING READ..." << std::endl;
-#endif
-    if (isServing) {
-        // If I'm server, I signal I'm ready for RDMA write, then wait for client's RDMA write completion
-        ktm_rdma_post_send(rdmaCmId, nullptr, completionMsg, 1, completionMr, 0);
-        num_wc = ktm_rdma_get_send_comp(rdmaCmId, &workCompletion);
-
-        ktm_rdma_post_recv(rdmaCmId, nullptr, completionMsg, 1, completionMr);
-        num_wc = ktm_rdma_get_recv_comp(rdmaCmId, &workCompletion);
-    }
-    else {
-        // If I'm client, I wait the server signal, then I RDMA read to server and then send a completion
-        ktm_rdma_post_recv(rdmaCmId, nullptr, completionMsg, 1, completionMr);
-        num_wc = ktm_rdma_get_recv_comp(rdmaCmId, &workCompletion);
-
-        ktm_rdma_post_read(rdmaCmId, nullptr, buffer, size, memoryRegion, IBV_WR_RDMA_READ, peer_address, peer_rkey);
-
-        ktm_rdma_post_send(rdmaCmId, nullptr, completionMsg, 1, completionMr, 0);
-        num_wc = ktm_rdma_get_send_comp(rdmaCmId, &workCompletion);
-    }
-#ifdef DEBUG
-    std::cout << tab << "DONE! (performing read)" << std::endl;
-#endif
-
-    rdma_dereg_mr(memoryRegion);
-    rdma_dereg_mr(completionMr);
-
-    return 1;
-}
-
-size_t RdmaCommunicator::Write(const char *buffer, size_t size) {
-#ifdef DEBUG
-    std::cout << "RdmaCommunicator::Write(): called." << std::endl;
-#endif
-    // If I'm client, I want to write buffer to the server
-    // If I'm server, I want to set buffer to the client to read
-
-    char * rdmaExcBuffer = static_cast<char *>(malloc(BUF_SIZE));
-    ibv_mr * rdmaExcMr = ktm_rdma_reg_msgs(rdmaCmId, rdmaExcBuffer, BUF_SIZE);
-
-    char * actualBuffer = static_cast<char *>(calloc(size, sizeof(char)));
-    memcpy(actualBuffer, buffer, size);
-
-    uintptr_t peer_address = 0;
-    uint32_t peer_rkey = 0;
-
-    ibv_mr * memoryRegion;
-
-#ifdef DEBUG
-    std::cout << tab << "EXCHANGING RDMA INFORMATIONS..." << std::endl;
-#endif
-    if (isServing) {
-        // If I'm server, I want to set buffer to the client to read
-        memoryRegion = ktm_rdma_reg_read(rdmaCmId, (void *) actualBuffer, size);
-
-        ktm_server_exchange_rdma_info(rdmaCmId, rdmaExcBuffer, BUF_SIZE, rdmaExcMr, &peer_address, &peer_rkey, memoryRegion);
-#ifdef DEBUG
-        std::cout << doubletab << "server: " << "using peer address: " << peer_address << " (" << (void *) peer_address << ") and peer rkey: " << peer_rkey << std::endl;
-        std::cout << doubletab << "the buffer is now rdma-read ready." << std::endl;
-        std::cout << doubletab << "buffer: <<<" << actualBuffer << ">>>" << std::endl;
-#endif
-    }
-    else {
-        // If I'm client, I want to write buffer to the server
-        memoryRegion = ktm_rdma_reg_msgs(rdmaCmId, (void *) actualBuffer, size);
-
-        ktm_client_exchange_rdma_info(rdmaCmId, rdmaExcBuffer, BUF_SIZE, rdmaExcMr, &peer_address, &peer_rkey, memoryRegion);
-#ifdef DEBUG
-        std::cout << doubletab << "client: " << "using peer address: " << peer_address << " (" << (void * ) peer_address << ") and peer rkey: " << peer_rkey << std::endl;
-        std::cout << doubletab << "the buffer is now ready to be written." << std::endl;
-        std::cout << doubletab << "buffer: <<<" << actualBuffer << ">>>" << std::endl;
-#endif
-    }
-#ifdef DEBUG
-    std::cout << tab << "DONE! (exchanging rdma informations)" << std::endl;
-#endif
-
-#ifdef DEBUG
-    std::cout << tab << "self address: " << (uintptr_t) memoryRegion->addr << "(" << memoryRegion->addr << "), self rkey: " << memoryRegion->rkey << std::endl;
-    std::cout << tab << "actualBuffer address: " << (void * ) actualBuffer << " (" << (uintptr_t) actualBuffer << ")" << std::endl;
-#endif
-
-    rdma_dereg_mr(rdmaExcMr);
-    free(rdmaExcBuffer);
-
-    int num_wc;
-    ibv_wc workCompletion;
-    memset(&workCompletion, 0, sizeof(workCompletion));
-
-    char * completionMsg = static_cast<char *>(calloc(1, sizeof(char)));
-    ibv_mr * completionMr = ktm_rdma_reg_msgs(rdmaCmId, completionMsg, 1);
-
-#ifdef DEBUG
-    std::cout << tab << "PERFORMING WRITE..." << std::endl;
-#endif
-    if (isServing) {
-        // If I'm server, I signal I'm ready for RDMA read, then wait for client's RDMA read completion
-        ktm_rdma_post_send(rdmaCmId, nullptr, completionMsg, 1, completionMr, 0);
-        num_wc = ktm_rdma_get_send_comp(rdmaCmId, &workCompletion);
-
-        ktm_rdma_post_recv(rdmaCmId, nullptr, completionMsg, 1, completionMr);
-        num_wc = ktm_rdma_get_recv_comp(rdmaCmId, &workCompletion);
-    }
-    else {
-        // If I'm client, I wait the server signal, then I RDMA write to server and then send a completion
-        ktm_rdma_post_recv(rdmaCmId, nullptr, completionMsg, 1, completionMr);
-        num_wc = ktm_rdma_get_recv_comp(rdmaCmId, &workCompletion);
-
-        ktm_rdma_post_write(rdmaCmId, nullptr, actualBuffer, size, memoryRegion, IBV_WR_RDMA_WRITE, peer_address, peer_rkey);
-
-        ktm_rdma_post_send(rdmaCmId, nullptr, completionMsg, 1, completionMr, 0);
-        num_wc = ktm_rdma_get_send_comp(rdmaCmId, &workCompletion);
-    }
-#ifdef DEBUG
-    std::cout << tab << "DONE! (performing write)" << std::endl;
-#endif
-
-    rdma_dereg_mr(memoryRegion);
-    rdma_dereg_mr(completionMr);
-
-    return 1;
-}
-*/
-
 size_t RdmaCommunicator::Read(char *buffer, size_t size) {
 #ifdef DEBUG
     std::cout << "RdmaCommunicator::Read(): called." << std::endl;
@@ -335,6 +151,7 @@ size_t RdmaCommunicator::Read(char *buffer, size_t size) {
     rdma_dereg_mr(completionMr);
     free(completionMsg);
 
+    // FIXME: Return the number of successfully read bytes instead
     return 1;
 }
 
@@ -398,6 +215,7 @@ size_t RdmaCommunicator::Write(const char *buffer, size_t size) {
     free(actualBuffer);
     free(completionMsg);
 
+    // FIXME: Return the number of successfully written bytes instead
     return 1;
 }
 
@@ -405,13 +223,15 @@ void RdmaCommunicator::Sync() {
 #ifdef DEBUG
     std::cout << "RdmaCommunicator::Sync(): called." << std::endl;
 #endif
+    // TODO: Implement.
+    std::cerr << "RdmaCommunicator::Sync() is not yet implemented!!!" << std::endl;
 }
 
 void RdmaCommunicator::Close() {
 #ifdef DEBUG
     std::cout << "RdmaCommunicator::Close(): called." << std::endl;
+#endif
     rdma_disconnect(rdmaCmId);
     rdma_destroy_id(rdmaCmId);
-#endif
 }
 
